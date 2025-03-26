@@ -1,13 +1,37 @@
-let Web3 = require('web3');
-let Solc = require('solc');
-let web3 = new Web3(new Web3.providers.HttpProvider("HTTP://127.0.0.1:8545"));
+const Web3 = require('web3');
+const solc = require('solc');
 const fs = require('fs');
 
-const sourceCode = fs.readFileSync('C:\\Users\\HP\\Desktop\\safe\\backend\\contracts\\Cruds.sol').toString();
+// Connect to the local Ethereum node (Ganache)
+const web3 = new Web3(new Web3.providers.HttpProvider("http://127.0.0.1:8545"));
 
-const compiledCode = Solc.compile(sourceCode, 1);
-// const contractABI = JSON.parse(compiledCode.contracts['Cruds'].interface);
-console.log(compiledCode.contracts);
-// const addContract = web3.eth.contract(contractABI);
-// const byteCode = compiledCode.contracts[':Cruds'].bytecode;
-// const addDeployed = addContract.new({data: byteCode, from: web3.eth.accounts[0], gas: 4700000});
+// Read and compile Solidity contract
+const sourceCode = fs.readFileSync('./contracts/Cruds.sol', 'utf8');
+
+const input = {
+  language: 'Solidity',
+  sources: {
+    'Cruds.sol': { content: sourceCode }
+  },
+  settings: { outputSelection: { '*': { '*': ['abi', 'evm.bytecode'] } } }
+};
+
+const compiledCode = JSON.parse(solc.compile(JSON.stringify(input)));
+
+// Extract ABI and Bytecode
+const contractName = Object.keys(compiledCode.contracts['Cruds.sol'])[0];
+const contractABI = compiledCode.contracts['Cruds.sol'][contractName].abi;
+const bytecode = compiledCode.contracts['Cruds.sol'][contractName].evm.bytecode.object;
+
+const deployContract = async () => {
+  const accounts = await web3.eth.getAccounts();
+  console.log("Deploying from account:", accounts[0]);
+
+  const contract = new web3.eth.Contract(contractABI);
+  const deployedContract = await contract.deploy({ data: bytecode })
+    .send({ from: accounts[0], gas: 4700000 });
+
+  console.log("Contract deployed at:", deployedContract.options.address);
+};
+
+deployContract().catch(console.error);
