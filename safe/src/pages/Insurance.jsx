@@ -1,221 +1,172 @@
-import React, { useState, Fragment, useEffect } from "react";
-import { nanoid } from "nanoid";
+import React, { useState, useEffect } from "react";
 import Web3 from "web3";
 import Navbar from "../components/Navbar";
 import Footer from "../components/Footer";
 import Sidebar from "../components/Sidebar";
 import contract from "../contracts/contract.json";
 import { useCookies } from "react-cookie";
-import { create } from 'ipfs-http-client'
+import { create } from 'ipfs-http-client';
 
 const Insurance = () => {
   const web3 = new Web3(window.ethereum);
-  const mycontract = new web3.eth.Contract(
-    contract["abi"],
-    contract["address"]
-  );
+  const mycontract = new web3.eth.Contract(contract["abi"], contract["address"]);
   const [cookies, setCookie] = useCookies();
-  const [insurances, setInsurance] = useState([]);
+  const [insurances, setInsurances] = useState([]);
 
   useEffect(() => {
-    const ins = [];
-    async function getIns() {
-      await mycontract.methods
-        .getPatient()
-        .call()
-        .then(async (res) => {
-          for (let i = res.length - 1; i >= 0; i--) {
-            if (res[i] === cookies['hash']) {
-              const data = await (await fetch(`http://localhost:8080/ipfs/${res[i]}`)).json();
-              ins.push(data.insurance);
-              break;
-            }
-          }
-        });
-        // console.log(ins);
-      setInsurance(ins);
-    }
-    getIns();
-    return;
-  }, [insurances.length]);
+    if (!cookies["hash"]) return;
 
-
-  const [addFormData, setAddFormData] = useState({
-    company: "",
-    policyNo: "",
-    expiry: "",
-  });
-
-  const handleAddFormChange = (event) => {
-    const newFormData = { ...addFormData };
-    newFormData[event.target.name] = event.target.value;
-    setAddFormData(newFormData);
-  };
-
-
-  async function submit() {
-    var accounts = await window.ethereum.request({
-      method: "eth_requestAccounts",
-    });
-    var currentaddress = accounts[0];
-
-    mycontract.methods
-      .getPatient()
-      .call()
-      .then(async (res) => {
-        for (let i = res.length - 1; i >= 0; i--) {
-          if (res[i] === cookies['hash']) {
-            const data = await (await fetch(`http://localhost:8080/ipfs/${res[i]}`)).json();
-            const ins = data.insurance;
-            ins.push(addFormData);
-
-            data.insurance = ins;
-            let client = create();
-            client = create(new URL('http://127.0.0.1:5001'));
-            const { cid } = await client.add(JSON.stringify(data));
-            const hash = cid['_baseCache'].get('z');
-
-            await mycontract.methods.addPatient(hash).send({ from: currentaddress }).then(() => {
-              setCookie('hash', hash);
-              alert("Insurance Added");
-              window.location.reload();
-            }).catch((err) => {
-              console.log(err);
-            })
-          }
-        }
-      });
-  }
-
-
-  async function del(policy) {
-    var accounts = await window.ethereum.request({
-      method: "eth_requestAccounts",
-    });
-    var currentaddress = accounts[0];
-
-    const web3 = new Web3(window.ethereum);
-    const mycontract = new web3.eth.Contract(
-      contract["abi"],
-      contract["address"]
-    );
-
-    mycontract.methods.getPatient().call().then(async (res) => {
+    async function fetchInsurances() {
+      const res = await mycontract.methods.getPatient().call();
       for (let i = res.length - 1; i >= 0; i--) {
-        if (res[i] === cookies['hash']) {
-          const data = await (await fetch(`http://localhost:8080/ipfs/${res[i]}`)).json();
-          const alls = data.insurance;
-          const newList = [];
-          for (let i = 1; i < alls.length; i++) {
-            if (alls[i].policyNo === policy) {
-              continue;
-            }
-            else {
-              newList.push(alls[[i]]);
-            }
+        if (res[i] === cookies["hash"]) {
+          try {
+            const data = await fetch(`http://localhost:8080/ipfs/${res[i]}`).then(res => res.json());
+            setInsurances(data.insurance || []);
+          } catch (error) {
+            console.error("Error fetching insurance data:", error);
           }
-          data.insurance = newList;
-
-          let client = create();
-          client = create(new URL('http://127.0.0.1:5001'));
-          const { cid } = await client.add(JSON.stringify(data));
-          const hash = cid['_baseCache'].get('z');
-
-          await mycontract.methods.addPatient(hash).send({ from: currentaddress }).then(() => {
-            setCookie('hash', hash);
-            alert("Deleted");
-            window.location.reload();
-          }).catch((err) => {
-            console.log(err);
-          })
+          break;
         }
       }
-    })
-  }
-
-  function showInsurances() {
-    if (insurances.length > 0) {
-      return insurances[0].map(data => {
-        return (
-          <tr>
-            <td>{data.company}</td>
-            <td>{data.policyNo}</td>
-            <td>{data.expiry}</td>
-            <td>
-              <input type="button" value="Delete" onClick={() => del(data.policyNo)} />
-            </td>
-          </tr>
-        )
-      })
     }
-  }
+    fetchInsurances();
+  }, [cookies["hash"]]);
+
+  const [formData, setFormData] = useState({ company: "", policyNo: "", expiry: "" });
+
+  const handleInputChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const submitInsurance = async () => {
+    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+    const currentAddress = accounts[0];
+
+    const res = await mycontract.methods.getPatient().call();
+    for (let i = res.length - 1; i >= 0; i--) {
+      if (res[i] === cookies["hash"]) {
+        const data = await fetch(`http://localhost:8080/ipfs/${res[i]}`).then(res => res.json());
+        data.insurance.push(formData);
+
+        let client = create(new URL("http://127.0.0.1:5001"));
+        const { cid } = await client.add(JSON.stringify(data));
+        const hash = cid.toString();
+
+        await mycontract.methods.addPatient(hash).send({ from: currentAddress });
+        setCookie("hash", hash);
+        alert("Insurance Added");
+        setInsurances([...insurances, formData]); // Update UI without reload
+      }
+    }
+  };
+
+  const deleteInsurance = async (policyNo) => {
+    const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+    const currentAddress = accounts[0];
+
+    const res = await mycontract.methods.getPatient().call();
+    for (let i = res.length - 1; i >= 0; i--) {
+      if (res[i] === cookies["hash"]) {
+        const data = await fetch(`http://localhost:8080/ipfs/${res[i]}`).then(res => res.json());
+        data.insurance = data.insurance.filter((ins) => ins.policyNo !== policyNo);
+
+        let client = create(new URL("http://127.0.0.1:5001"));
+        const { cid } = await client.add(JSON.stringify(data));
+        const hash = cid.toString();
+
+        await mycontract.methods.addPatient(hash).send({ from: currentAddress });
+        setCookie("hash", hash);
+        alert("Insurance Deleted");
+        setInsurances(data.insurance); // Update UI without reload
+      }
+    }
+  };
 
   return (
     <div className="flex relative dark:bg-main-dark-bg">
-      <div className="w-72 fixed sidebar dark:bg-secondary-dark-bg bg-white ">
+      <div className="w-72 fixed sidebar dark:bg-secondary-dark-bg bg-white">
         <Sidebar />
       </div>
 
-      <div
-        className={
-          "dark:bg-main-dark-bg  bg-main-bg min-h-screen ml-72 w-full  "
-        }
-      >
-        <div className="fixed md:static bg-main-bg dark:bg-main-dark-bg navbar w-full ">
+      <div className="dark:bg-main-dark-bg bg-main-bg min-h-screen ml-72 w-full">
+        <div className="fixed md:static bg-main-bg dark:bg-main-dark-bg navbar w-full">
           <Navbar />
         </div>
-        <div
-          style={{ display: "flex", flexDirection: "column", padding: "4rem", justifyContent: "center", alignItems: "flex-end", gap: "4rem" }}
-        >
-          <form style={{ width: "100%" }}>
-            <table style={{ borderCollapse: "collapse" }}>
-              <thead>
-                <tr>
-                  <th className="">Policy Number</th>
-                  <th className="">Company</th>
-                  <th className="">Expiry</th>
-                  <th className="">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {showInsurances()}
-              </tbody>
-            </table>
-          </form>
 
-          <form style={{
-            display: 'flex', flexDirection: 'column', gap: '1rem',
-            backgroundColor: 'rgb(3, 201, 215)',
-            justifyContent: 'center',
-            alignItems: 'center',
-            padding: '24px',
-            borderRadius: '20px',
-          }}>
-            <h2>Add an Insurance</h2>
+        <div className="p-10 flex flex-col items-center">
+          <h1 className="text-2xl font-bold mb-6">Insurance Policies</h1>
+          
+          {/* Insurance Table */}
+          <table className="w-full border-collapse border border-gray-300 shadow-lg bg-white rounded-lg">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="border px-4 py-2">Company</th>
+                <th className="border px-4 py-2">Policy Number</th>
+                <th className="border px-4 py-2">Expiry</th>
+                <th className="border px-4 py-2">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {insurances.length > 0 ? (
+                insurances.map((data, index) => (
+                  <tr key={index} className="text-center">
+                    <td className="border px-4 py-2">{data.company}</td>
+                    <td className="border px-4 py-2">{data.policyNo}</td>
+                    <td className="border px-4 py-2">{data.expiry}</td>
+                    <td className="border px-4 py-2">
+                      <button
+                        className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition"
+                        onClick={() => deleteInsurance(data.policyNo)}
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="4" className="border px-4 py-2 text-center text-gray-500">
+                    No insurance policies found.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+
+          {/* Add Insurance Form */}
+          <div className="mt-10 p-6 bg-blue-100 rounded-lg shadow-md w-full max-w-md">
+            <h2 className="text-xl font-semibold mb-4">Add New Insurance</h2>
             <input
+              className="w-full p-2 mb-3 border rounded"
               type="text"
               name="company"
-              required="required"
               placeholder="Company"
-              onChange={handleAddFormChange}
+              onChange={handleInputChange}
             />
             <input
+              className="w-full p-2 mb-3 border rounded"
               type="text"
               name="policyNo"
-              required="required"
               placeholder="Policy No."
-              onChange={handleAddFormChange}
+              onChange={handleInputChange}
             />
             <input
+              className="w-full p-2 mb-3 border rounded"
               type="text"
               name="expiry"
-              required="required"
               placeholder="Expiry Date"
-              onChange={handleAddFormChange}
+              onChange={handleInputChange}
             />
-            <input type="button" value="Save" onClick={submit} />
-          </form>
+            <button
+              className="w-full bg-cyan-500 text-white py-2 rounded hover:bg-cyan-600 transition"
+              onClick={submitInsurance}
+            >
+              Save
+            </button>
+          </div>
         </div>
+
         <Footer />
       </div>
     </div>

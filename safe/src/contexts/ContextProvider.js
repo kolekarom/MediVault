@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useMemo, useEffect } from 'react';
 
 const StateContext = createContext();
 
@@ -11,30 +11,49 @@ const initialState = {
 
 export const ContextProvider = ({ children }) => {
   const [screenSize, setScreenSize] = useState(undefined);
-  const [currentColor, setCurrentColor] = useState('#03C9D7');
-  const [currentMode, setCurrentMode] = useState('Light');
+  const [currentColor, setCurrentColor] = useState(localStorage.getItem('colorMode') || '#03C9D7');
+  const [currentMode, setCurrentMode] = useState(localStorage.getItem('themeMode') || 'Light');
   const [themeSettings, setThemeSettings] = useState(false);
   const [activeMenu, setActiveMenu] = useState(true);
   const [isClicked, setIsClicked] = useState(initialState);
 
-  const setMode = (e) => {
-    setCurrentMode(e.target.value);
-    localStorage.setItem('themeMode', e.target.value);
-  };
+  // Save theme mode to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('themeMode', currentMode);
+  }, [currentMode]);
 
-  const setColor = (color) => {
-    setCurrentColor(color);
-    localStorage.setItem('colorMode', color);
-  };
+  // Save color mode to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('colorMode', currentColor);
+  }, [currentColor]);
 
+  const setMode = (mode) => setCurrentMode(mode);
+  const setColor = (color) => setCurrentColor(color);
   const handleClick = (clicked) => setIsClicked({ ...initialState, [clicked]: true });
 
-  return (
-    // eslint-disable-next-line react/jsx-no-constructed-context-values
-    <StateContext.Provider value={{ currentColor, currentMode, activeMenu, screenSize, setScreenSize, handleClick, isClicked, initialState, setIsClicked, setActiveMenu, setCurrentColor, setCurrentMode, setMode, setColor, themeSettings, setThemeSettings }}>
-      {children}
-    </StateContext.Provider>
+  // Optimize Context value using useMemo to prevent unnecessary re-renders
+  const contextValue = useMemo(
+    () => ({
+      currentColor,
+      currentMode,
+      activeMenu,
+      screenSize,
+      setScreenSize,
+      handleClick,
+      isClicked,
+      setIsClicked,
+      setActiveMenu,
+      setCurrentColor,
+      setCurrentMode,
+      setMode,
+      setColor,
+      themeSettings,
+      setThemeSettings,
+    }),
+    [currentColor, currentMode, activeMenu, screenSize, isClicked, themeSettings]
   );
+
+  return <StateContext.Provider value={contextValue}>{children}</StateContext.Provider>;
 };
 
 export const useStateContext = () => useContext(StateContext);

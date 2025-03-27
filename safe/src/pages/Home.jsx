@@ -172,7 +172,7 @@ const Home = () => {
 
       {/* Footer Section */}
       <footer className="footer section">
-        <p className="footer__copy">Designed and Developed by The Blockheads</p>
+        <p className="footer__copy">Designed and Developed by The Data-Pirates</p>
         <p className="footer__copy">&#169; MediVault. All rights reserved.</p>
       </footer>
     </div>

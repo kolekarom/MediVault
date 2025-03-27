@@ -17,5 +17,10 @@
   "bugs": {
     "url": "https://github.com/kolekarom/MediVault/issues"
   },
-  "homepage": "https://github.com/kolekarom/MediVault#readme"
+  "homepage": "https://github.com/kolekarom/MediVault#readme",
+  "dependencies": {
+    "fs": "^0.0.1-security",
+    "solc": "^0.8.29",
+    "web3": "^4.16.0"
+  }
 }
