@@ -43,6 +43,7 @@ const App = () => {
                 <Route path="/doctors" element={<Doctors />} />
                 <Route path="/patients" element={<Patients />} />
                 <Route exact path="/patientData/:phash" element={<PatientInfo />} />
+                
 
               </Routes>
       </BrowserRouter>
