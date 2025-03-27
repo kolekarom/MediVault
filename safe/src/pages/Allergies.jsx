@@ -229,3 +229,4 @@ const Allergies = () => {
 };
 
 export default Allergies;
+//text
